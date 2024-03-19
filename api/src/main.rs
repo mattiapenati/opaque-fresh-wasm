@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use config::Config;
 
 mod config;
+mod invitation;
 mod opaque;
 
 fn main() -> Result<()> {
@@ -16,6 +17,8 @@ fn main() -> Result<()> {
         }
         Commands::Run(cmd) => {
             let config = Config::load(cmd.config.as_deref())?;
+            let code = invitation::InvitationCode::random();
+            eprintln!("{}", code.display());
         }
     }
     Ok(())

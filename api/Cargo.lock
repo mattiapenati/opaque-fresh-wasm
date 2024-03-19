@@ -509,6 +509,7 @@ dependencies = [
  "rand_chacha",
  "serde",
  "tokio",
+ "zeroize",
 ]
 
 [[package]]
