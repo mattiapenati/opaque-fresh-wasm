@@ -2,23 +2,26 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use config::Config;
+
+use crate::{config::Config, db::Database, opaque::OpaqueServer};
 
 mod config;
+mod db;
 mod invitation;
 mod opaque;
+mod storage;
+mod time;
 
 fn main() -> Result<()> {
     let args = Args::parse();
     match args.command {
         Commands::Genkey => {
-            let key = opaque::OpaqueServer::generate_random_key();
+            let key = OpaqueServer::generate_random_key();
             println!("{key}");
         }
         Commands::Run(cmd) => {
             let config = Config::load(cmd.config.as_deref())?;
-            let code = invitation::InvitationCode::random();
-            eprintln!("{}", code.display());
+            run(config)?;
         }
     }
     Ok(())
@@ -43,4 +46,14 @@ struct RunArgs {
     /// Configuration file
     #[arg(short, long)]
     config: Option<PathBuf>,
+}
+
+fn run(config: Config) -> Result<()> {
+    let db = Database::new(&config.storage)?;
+    let first_invitation = db.create_first_signup_invitation(&config.admin_user)?;
+    if let Some(invitation_code) = first_invitation {
+        eprintln!("{}", invitation_code.display());
+    }
+
+    Ok(())
 }

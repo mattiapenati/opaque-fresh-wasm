@@ -1,6 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Result};
@@ -14,12 +14,15 @@ use serde::Deserialize;
 pub struct Config {
     pub listen_addr: SocketAddr,
     pub private_key: String,
+    pub admin_user: String,
+    pub storage: PathBuf,
 }
 
 impl Config {
     pub fn load(path: Option<&Path>) -> Result<Self> {
         let localhost = IpAddr::V4(Ipv4Addr::LOCALHOST);
         let default_listen_addr = SocketAddr::new(localhost, 8080);
+        let default_admin_uer = "root";
 
         let mut config = Figment::new();
         if let Some(path) = path {
@@ -27,8 +30,9 @@ impl Config {
             config = config.merge(provider);
         }
         config = config
-            .merge(Env::raw().only(&["LISTEN_ADDR", "PRIVATE_KEY"]))
-            .join(Serialized::default("listen_addr", default_listen_addr));
+            .merge(Env::raw())
+            .join(Serialized::default("listen_addr", default_listen_addr))
+            .join(Serialized::default("admin_user", default_admin_uer));
         config
             .extract()
             .map_err(|err| anyhow!("failed to load configuration, {}", err.kind))
@@ -49,6 +53,8 @@ mod tests {
         Jail::expect_with(|jail| {
             jail.set_env("LISTEN_ADDR", "[::1]:6789");
             jail.set_env("PRIVATE_KEY", "abcdefgh");
+            jail.set_env("ADMIN_USER", "xyz");
+            jail.set_env("STORAGE", "/tmp/storage.sqlite");
 
             let config = assert_ok!(Config::load(None));
             assert_eq!(
@@ -56,6 +62,7 @@ mod tests {
                 SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 6789)
             );
             assert_eq!(config.private_key, "abcdefgh");
+            assert_eq!(config.admin_user, "xyz");
 
             Ok(())
         });
@@ -67,8 +74,10 @@ mod tests {
             assert_ok!(jail.create_file(
                 "config.toml",
                 r#"
-                listen_addr="[::1]:6789"
-                private_key="abcdefgh"
+                listen_addr = "[::1]:6789"
+                private_key = "abcdefgh"
+                admin_user = "xyz"
+                storage = "/tmp/storage.sqlite"
                 "#,
             ));
 
@@ -79,6 +88,7 @@ mod tests {
                 SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 6789)
             );
             assert_eq!(config.private_key, "abcdefgh");
+            assert_eq!(config.admin_user, "xyz");
 
             Ok(())
         });

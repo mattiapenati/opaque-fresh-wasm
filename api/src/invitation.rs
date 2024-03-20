@@ -1,11 +1,18 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, time::Duration};
 
 use base64ct::{Base64Url, Encoding};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
+use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+use crate::time::DateTime;
+
 /// Invitation code.
+///
+/// Invitation code is a sequence of random bytes generated using a
+/// cryptographically secure random number generator. Invitation codes can be
+/// displayed using the base64 (url standard) encoding.
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct InvitationCode(InvitationCodeBytes);
 
@@ -37,5 +44,29 @@ impl<'a> std::fmt::Display for DisplayInvitationCode<'a> {
         let Self(bytes) = self;
         let encoded_code = Base64Url::encode_string(bytes);
         f.write_str(&encoded_code)
+    }
+}
+
+/// Signup invitation.
+#[derive(Deserialize, Serialize)]
+pub struct Invitation {
+    /// Invited username (should match on registration).
+    pub username: String,
+    /// Expiration of the this invitation.
+    pub expiration: DateTime,
+}
+
+/// Default invitation lifetime (1 day).
+const INVITATION_LIFETIME: Duration = Duration::from_secs(24 * 3_600);
+
+impl Invitation {
+    pub fn new(username: &str) -> Self {
+        let username = username.to_owned();
+        let expiration = DateTime::now() + INVITATION_LIFETIME;
+
+        Self {
+            username,
+            expiration,
+        }
     }
 }
