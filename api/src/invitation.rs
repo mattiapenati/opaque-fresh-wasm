@@ -36,6 +36,23 @@ impl InvitationCode {
     }
 }
 
+impl<'de> Deserialize<'de> for InvitationCode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let encoded_code = <&str as Deserialize>::deserialize(deserializer)?;
+        let mut code_bytes = InvitationCodeBytes::default();
+        Base64Url::decode(encoded_code.as_bytes(), &mut code_bytes[..]).map_err(|err| {
+            serde::de::Error::custom(format!(
+                "invitation code is not a valid base64 encoded string: {err}"
+            ))
+        })?;
+
+        Ok(Self(code_bytes))
+    }
+}
+
 /// Helper struct for explicit printing a `InvitationCode`.
 pub struct DisplayInvitationCode<'a>(&'a [u8]);
 
@@ -68,5 +85,10 @@ impl Invitation {
             username,
             expiration,
         }
+    }
+
+    /// Check if the invitation is expired.
+    pub fn is_expired(&self) -> bool {
+        self.expiration < DateTime::now()
     }
 }

@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use crate::{config::Config, db::Database, opaque::OpaqueServer};
+use crate::{config::Config, opaque::OpaqueServer};
 
+mod api;
 mod config;
 mod db;
 mod invitation;
 mod opaque;
-mod storage;
 mod time;
 
 fn main() -> Result<()> {
@@ -49,11 +49,11 @@ struct RunArgs {
 }
 
 fn run(config: Config) -> Result<()> {
-    let db = Database::new(&config.storage)?;
-    let first_invitation = db.create_first_signup_invitation(&config.admin_user)?;
-    if let Some(invitation_code) = first_invitation {
-        eprintln!("{}", invitation_code.display());
-    }
+    mello::trace::init(&Default::default())?;
 
-    Ok(())
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("failed to build tokio runtime");
+    runtime.block_on(api::serve(&config))
 }
