@@ -1,12 +1,13 @@
-use std::{cell::RefCell, time::Duration};
+use std::cell::RefCell;
 
+use anyhow::Result;
 use base64ct::{Base64Url, Encoding};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use crate::time::DateTime;
+use crate::time::{DateTime, Duration};
 
 /// Invitation code.
 ///
@@ -14,9 +15,14 @@ use crate::time::DateTime;
 /// cryptographically secure random number generator. Invitation codes can be
 /// displayed using the base64 (url standard) encoding.
 #[derive(Zeroize, ZeroizeOnDrop)]
-pub struct InvitationCode(InvitationCodeBytes);
+pub struct InvitationCode {
+    bytes: InvitationCodeBytes,
+}
 
-type InvitationCodeBytes = [u8; 32];
+const INVITATION_CODE_BYTES: usize = 48;
+const INVITATION_CODE_ENCODED: usize = 64;
+
+type InvitationCodeBytes = [u8; INVITATION_CODE_BYTES];
 
 thread_local! {
     static RNG: RefCell<ChaChaRng> = RefCell::new(ChaChaRng::from_entropy());
@@ -25,14 +31,14 @@ thread_local! {
 impl InvitationCode {
     /// Generate a new random invitation code.
     pub fn random() -> InvitationCode {
-        let mut bytes = InvitationCodeBytes::default();
+        let mut bytes = [0_u8; INVITATION_CODE_BYTES];
         RNG.with_borrow_mut(|rng| rng.fill_bytes(&mut bytes));
-        Self(bytes)
+        Self { bytes }
     }
 
     /// Returns an object for printing the invitation code.
     pub fn display(&self) -> DisplayInvitationCode<'_> {
-        DisplayInvitationCode(&self.0)
+        DisplayInvitationCode { bytes: &self.bytes }
     }
 }
 
@@ -41,26 +47,36 @@ impl<'de> Deserialize<'de> for InvitationCode {
     where
         D: serde::Deserializer<'de>,
     {
-        let encoded_code = <&str as Deserialize>::deserialize(deserializer)?;
-        let mut code_bytes = InvitationCodeBytes::default();
-        Base64Url::decode(encoded_code.as_bytes(), &mut code_bytes[..]).map_err(|err| {
-            serde::de::Error::custom(format!(
-                "invitation code is not a valid base64 encoded string: {err}"
-            ))
-        })?;
+        let encoded_code: &str = Deserialize::deserialize(deserializer)?;
+        let mut bytes = [0_u8; INVITATION_CODE_BYTES];
+        Base64Url::decode(encoded_code.as_bytes(), &mut bytes[..])
+            .map_err(serde::de::Error::custom)?;
 
-        Ok(Self(code_bytes))
+        Ok(Self { bytes })
+    }
+}
+
+impl Serialize for InvitationCode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut encoded_bytes = [0_u8; INVITATION_CODE_ENCODED];
+        let code = Base64Url::encode(&self.bytes, &mut encoded_bytes).unwrap();
+        serializer.serialize_str(code)
     }
 }
 
 /// Helper struct for explicit printing a `InvitationCode`.
-pub struct DisplayInvitationCode<'a>(&'a [u8]);
+pub struct DisplayInvitationCode<'a> {
+    bytes: &'a [u8],
+}
 
 impl<'a> std::fmt::Display for DisplayInvitationCode<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self(bytes) = self;
-        let encoded_code = Base64Url::encode_string(bytes);
-        f.write_str(&encoded_code)
+        let mut encoded_bytes = [0_u8; INVITATION_CODE_ENCODED];
+        let encoded_code = Base64Url::encode(self.bytes, &mut encoded_bytes).unwrap();
+        f.write_str(encoded_code)
     }
 }
 
@@ -74,7 +90,7 @@ pub struct Invitation {
 }
 
 /// Default invitation lifetime (1 day).
-const INVITATION_LIFETIME: Duration = Duration::from_secs(24 * 3_600);
+const INVITATION_LIFETIME: Duration = Duration::hours(24);
 
 impl Invitation {
     pub fn new(username: &str) -> Self {

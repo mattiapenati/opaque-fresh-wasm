@@ -7,10 +7,11 @@ use crate::{config::Config, opaque::OpaqueServer};
 
 mod api;
 mod config;
-mod db;
 mod invitation;
 mod opaque;
+mod session;
 mod time;
+mod user;
 
 fn main() -> Result<()> {
     let args = Args::parse();

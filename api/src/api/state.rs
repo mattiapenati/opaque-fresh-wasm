@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use mello::kvstorage::KVStorage;
 
-use crate::{
-    db::Database,
-    invitation::{Invitation, InvitationCode},
-};
+use crate::opaque::OpaqueServer;
 
 /// Application state
 #[derive(Clone)]
@@ -14,21 +11,24 @@ pub struct AppState {
 }
 
 struct Inner {
-    db: Database,
+    storage: KVStorage,
+    opaque: OpaqueServer,
 }
 
 impl AppState {
     /// Create a new application state.
-    pub fn new(db: Database) -> Self {
-        let inner = Inner { db };
+    pub fn new(storage: KVStorage, opaque: OpaqueServer) -> Self {
+        let inner = Inner { storage, opaque };
         Self {
             inner: Arc::new(inner),
         }
     }
 
-    /// Get the invitation from the code.
-    #[inline(always)]
-    pub fn get_signup_invitation(&self, code: &InvitationCode) -> Result<Option<Invitation>> {
-        self.inner.db.get_signup_invitation(code)
+    pub fn storage(&self) -> &KVStorage {
+        &self.inner.storage
+    }
+
+    pub fn opaque(&self) -> &OpaqueServer {
+        &self.inner.opaque
     }
 }
