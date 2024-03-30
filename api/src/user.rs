@@ -66,6 +66,7 @@ pub fn signup_invitation_is_valid(
 /// Signup session
 #[derive(Deserialize, Serialize)]
 pub struct SignupSession {
+    #[serde(serialize_with = "InvitationCode::serialize")]
     pub code: InvitationCode,
     created_at: DateTime,
 }

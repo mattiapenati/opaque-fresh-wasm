@@ -38,6 +38,7 @@ pub struct StartReq {
 
 #[derive(Serialize)]
 pub struct StartRes {
+    #[serde(serialize_with = "SessionId::serialize")]
     session: SessionId,
     message: opaque::RegistrationResponse,
 }

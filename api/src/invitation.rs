@@ -40,6 +40,16 @@ impl InvitationCode {
     pub fn display(&self) -> DisplayInvitationCode<'_> {
         DisplayInvitationCode { bytes: &self.bytes }
     }
+
+    /// Serializer function
+    pub fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut encoded_bytes = [0_u8; INVITATION_CODE_ENCODED];
+        let code = Base64Url::encode(&self.bytes, &mut encoded_bytes).unwrap();
+        serializer.serialize_str(code)
+    }
 }
 
 impl<'de> Deserialize<'de> for InvitationCode {
@@ -53,17 +63,6 @@ impl<'de> Deserialize<'de> for InvitationCode {
             .map_err(serde::de::Error::custom)?;
 
         Ok(Self { bytes })
-    }
-}
-
-impl Serialize for InvitationCode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut encoded_bytes = [0_u8; INVITATION_CODE_ENCODED];
-        let code = Base64Url::encode(&self.bytes, &mut encoded_bytes).unwrap();
-        serializer.serialize_str(code)
     }
 }
 

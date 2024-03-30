@@ -28,6 +28,16 @@ impl SessionId {
     pub fn display(&self) -> DisplaySessionId<'_> {
         DisplaySessionId { bytes: &self.bytes }
     }
+
+    /// Serializer function
+    pub fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut buffer = [0u8; ENCODED_BYTES];
+        let display = Base64Url::encode(&self.bytes, &mut buffer).unwrap();
+        serializer.serialize_str(display)
+    }
 }
 
 /// Helper struct for explicit printing a `SessionId`.
@@ -40,17 +50,6 @@ impl<'a> std::fmt::Display for DisplaySessionId<'a> {
         let mut encoded_bytes = [0_u8; ENCODED_BYTES];
         let encoded_code = Base64Url::encode(self.bytes, &mut encoded_bytes).unwrap();
         f.write_str(encoded_code)
-    }
-}
-
-impl serde::Serialize for SessionId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let mut buffer = [0u8; ENCODED_BYTES];
-        let display = Base64Url::encode(&self.bytes, &mut buffer).unwrap();
-        serializer.serialize_str(display)
     }
 }
 
