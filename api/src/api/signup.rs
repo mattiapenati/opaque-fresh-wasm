@@ -93,7 +93,7 @@ pub struct FinishReq {
 pub async fn finish(
     State(state): State<AppState>,
     Json(req): Json<FinishReq>,
-) -> Result<(), StatusCode> {
+) -> Result<Json<()>, StatusCode> {
     let FinishReq {
         session: session_id,
         message: registration_upload,
@@ -112,5 +112,5 @@ pub async fn finish(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    Ok(())
+    Ok(Json(()))
 }

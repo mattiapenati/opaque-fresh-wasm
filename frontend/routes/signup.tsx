@@ -2,7 +2,7 @@ import { Head } from "$fresh/runtime.ts";
 import { Handlers, PageProps } from "$fresh/server.ts";
 
 import SignUpForm from "#islands/SignUpForm.tsx";
-import { fetchInvitationUsername } from "#utils/api.ts";
+import { api, Invitation } from "#utils/api.ts";
 
 interface Data {
   code?: string;
@@ -33,4 +33,11 @@ export const handler: Handlers = {
       username,
     });
   },
+};
+
+const fetchInvitationUsername = async (code: string) => {
+  const response = await api.get<Invitation>(`/signup/invitation/${code}`);
+  if (response.ok) {
+    return response.data.username;
+  }
 };

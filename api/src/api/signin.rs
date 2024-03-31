@@ -66,7 +66,7 @@ pub struct FinishReq {
 pub async fn finish(
     State(state): State<AppState>,
     Json(req): Json<FinishReq>,
-) -> Result<(), StatusCode> {
+) -> Result<Json<()>, StatusCode> {
     let FinishReq {
         session: session_id,
         message: login_finalization,
@@ -86,5 +86,5 @@ pub async fn finish(
         StatusCode::UNAUTHORIZED
     })?;
 
-    Ok(())
+    Ok(Json(()))
 }

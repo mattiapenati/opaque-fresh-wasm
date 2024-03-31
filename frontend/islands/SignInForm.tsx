@@ -6,7 +6,7 @@ import Password from "#islands/form/Password.tsx";
 import Text from "#islands/form/Text.tsx";
 import Button from "#components/form/Button.tsx";
 import ErrorBox from "#islands/ErrorBox.tsx";
-import { signin } from "#utils/api.ts";
+import { signin } from "#utils/opaque.ts";
 
 export default function SignInForm() {
   const username = signal("");
@@ -25,6 +25,7 @@ export default function SignInForm() {
         username: form.get("username") as string,
         password: form.get("password") as string,
       });
+      window.location.href = "/";
     } catch (err) {
       errorMessage.value = (err instanceof Error)
         ? err.message

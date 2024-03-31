@@ -6,7 +6,7 @@ import Label from "#components/form/Label.tsx";
 import Password from "#islands/form/Password.tsx";
 import Text from "#islands/form/Text.tsx";
 import ErrorBox from "#islands/ErrorBox.tsx";
-import { signup } from "#utils/api.ts";
+import { signup } from "#utils/opaque.ts";
 
 interface Props {
   code?: string;

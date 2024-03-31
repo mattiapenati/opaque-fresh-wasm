@@ -1,152 +1,133 @@
-// @deno-types="../wasm/fresh_auth_frontend.d.ts"
-import {
-  checkCredentialsStrength,
-  OpaqueLogin,
-  OpaqueRegistration,
-} from "../wasm/fresh_auth_frontend.js";
+import { IS_BROWSER } from "$fresh/runtime.ts";
 
-interface Invitation {
-  username?: string;
-  expiration?: string;
+export interface ApiResponseOk<T> {
+  ok: true;
+  data: T;
 }
 
-const API_URL = "http://localhost:8080";
+export interface ApiResponseErr {
+  ok: false;
+  status: number;
+}
 
-export const fetchInvitationUsername = async (
-  code: string,
-): Promise<string | undefined> => {
-  const response = await fetch(`${API_URL}/api/signup/invitation/${code}`);
-  if (!response.ok) {
-    return;
+export type ApiResponse<T> = ApiResponseOk<T> | ApiResponseErr;
+
+export interface ApiOptions {
+  token?: string;
+}
+
+interface ApiRequest<T> {
+  method: string;
+  path: string;
+  body?: T;
+}
+
+export class Api {
+  readonly #url: string;
+  readonly #token?: string;
+
+  constructor(url: string, { token }: ApiOptions = {}) {
+    this.#url = new URL("/api", url).href;
+    this.#token = token;
   }
-  const invitation = await response.json() as Invitation;
-  return invitation.username;
-};
 
-export interface SignupArgs {
+  get<Res>(path: string): Promise<ApiResponse<Res>> {
+    return this.request({
+      method: "GET",
+      path,
+    });
+  }
+
+  post<Res = unknown, Req = unknown>(
+    path: string,
+    body: Req,
+  ): Promise<ApiResponse<Res>> {
+    return this.request({
+      method: "POST",
+      path,
+      body,
+    });
+  }
+
+  private async request<Res = unknown, Req = unknown>(
+    request: ApiRequest<Req>,
+  ): Promise<ApiResponse<Res>> {
+    const url = new URL(`${this.#url}${request.path}`);
+    const headers = new Headers();
+    if (this.#token) {
+      headers.set("authorization", `Bearer ${this.#token}`);
+    }
+    if (request.body) {
+      headers.set("content-type", "application/json");
+    }
+    const body = request.body ? JSON.stringify(request.body) : undefined;
+
+    const response = await fetch(url.href, {
+      method: request.method,
+      headers,
+      body,
+    });
+
+    if (response.ok) {
+      const data = await response.json() as Res;
+      return { ok: true, data };
+    } else {
+      return { ok: false, status: response.status };
+    }
+  }
+}
+
+let api: Api;
+if (IS_BROWSER) {
+  const url = location.href;
+  api = new Api(url);
+} else {
+  const default_url = "http://localhost:8080";
+  const url = Deno.env.get("API_URL") ?? default_url;
+  const token = Deno.env.get("API_TOKEN");
+  api = new Api(url, { token });
+}
+export { api };
+
+/** Invitation detail */
+export interface Invitation {
+  username: string;
+  expiration: string;
+}
+
+/** Sign up start step request */
+export interface SignupStartReq {
   code: string;
   username: string;
-  password: string;
+  message: string;
 }
 
-export const signup = async ({ code, username, password }: SignupArgs) => {
-  checkCredentialsStrength(username, password);
-  const opaqueRegistration = OpaqueRegistration.start(password);
-  const { session, message: startMessage } = await signupStart({
-    code,
-    username,
-    message: opaqueRegistration.message,
-  });
-  const { message: finishMessage } = opaqueRegistration.finish(
-    password,
-    startMessage,
-  );
-  await signupFinish({ session, message: finishMessage });
-};
+/** Sign up start step response */
+export interface SignupStartRes {
+  session: string;
+  message: string;
+}
 
-interface SignupStartReq {
-  code: string;
+/** Sign up finish step request */
+export interface SignupFinishReq {
+  session: string;
+  message: string;
+}
+
+/** Sign in start step request */
+export interface SigninStartReq {
   username: string;
   message: string;
 }
 
-interface SignupStartRes {
+/** Sign in start step response */
+export interface SigninStartRes {
   session: string;
   message: string;
 }
 
-const signupStart = async (req: SignupStartReq) => {
-  const response = await fetch("/api/signup/start", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(req),
-  });
-  if (response.status === 401) {
-    throw new Error("Invalid credentials");
-  }
-  if (!response.ok) {
-    throw new Error("Sign up server is not available");
-  }
-
-  return await response.json() as SignupStartRes;
-};
-
-interface SignupFinishReq {
+/** Sign in finish step request */
+export interface SigninFinishReq {
   session: string;
   message: string;
 }
-
-const signupFinish = async (req: SignupFinishReq) => {
-  const response = await fetch("/api/signup/finish", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(req),
-  });
-
-  if (response.status === 401) {
-    throw new Error("Invalid credentials");
-  }
-  if (!response.ok) {
-    throw new Error("Signup server is not available");
-  }
-};
-
-export interface SigninArgs {
-  username: string;
-  password: string;
-}
-
-export const signin = async ({ username, password }: SigninArgs) => {
-  const opaqueLogin = OpaqueLogin.start(password);
-  const { session, message: startMessage } = await signinStart({
-    username,
-    message: opaqueLogin.message,
-  });
-  const { message: finishMessage } = opaqueLogin.finish(password, startMessage);
-  await signinFinish({ session, message: finishMessage });
-};
-
-interface SigninStartReq {
-  username: string;
-  message: string;
-}
-
-interface SigninStartRes {
-  session: string;
-  message: string;
-}
-
-const signinStart = async (req: SigninStartReq) => {
-  const response = await fetch("/api/signin/start", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(req),
-  });
-  if (response.status === 401) {
-    throw new Error("Invalid credentials");
-  }
-  if (!response.ok) {
-    throw new Error("Sign in server is not available");
-  }
-
-  return await response.json() as SigninStartRes;
-};
-
-interface SigninFinishReq {
-  session: string;
-  message: string;
-}
-
-const signinFinish = async (req: SigninFinishReq) => {
-  const response = await fetch("/api/signin/finish", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(req),
-  });
-  if (response.status === 401) {
-    throw new Error("Invalid credentials");
-  }
-  if (!response.ok) {
-    throw new Error("Sign in server is not available");
-  }
-};
