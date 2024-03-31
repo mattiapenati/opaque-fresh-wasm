@@ -16,6 +16,7 @@ pub struct Config {
     pub signature: String,
     pub admin_user: String,
     pub storage: PathBuf,
+    pub auth_token: String,
 }
 
 impl Config {
@@ -55,6 +56,7 @@ mod tests {
             jail.set_env("SIGNATURE", "abcdefgh");
             jail.set_env("ADMIN_USER", "xyz");
             jail.set_env("STORAGE", "/tmp/storage.sqlite");
+            jail.set_env("AUTH_TOKEN", "123abc456");
 
             let config = assert_ok!(Config::load(None));
             assert_eq!(
@@ -63,6 +65,7 @@ mod tests {
             );
             assert_eq!(config.signature, "abcdefgh");
             assert_eq!(config.admin_user, "xyz");
+            assert_eq!(config.auth_token, "123abc456");
 
             Ok(())
         });
@@ -78,6 +81,7 @@ mod tests {
                 signature = "abcdefgh"
                 admin_user = "xyz"
                 storage = "/tmp/storage.sqlite"
+                auth_token = "123abc456"
                 "#,
             ));
 
@@ -89,6 +93,7 @@ mod tests {
             );
             assert_eq!(config.signature, "abcdefgh");
             assert_eq!(config.admin_user, "xyz");
+            assert_eq!(config.auth_token, "123abc456");
 
             Ok(())
         });

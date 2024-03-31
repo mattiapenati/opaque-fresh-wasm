@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use session::SessionId;
 
 use crate::{config::Config, opaque::OpaqueSignature};
 
@@ -17,6 +18,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     match args.command {
         Commands::Gensign => gensign(),
+        Commands::Genkey => genkey(),
         Commands::Run(cmd) => {
             let config = Config::load(cmd.config.as_deref())?;
             run(config)?;
@@ -35,6 +37,8 @@ struct Args {
 enum Commands {
     /// Generate a new base64 encoded opaque signature.
     Gensign,
+    /// Geneate a random key, it can be used for the authentication token.
+    Genkey,
     /// Starts the service and blocks indefinitely
     Run(RunArgs),
 }
@@ -42,6 +46,11 @@ enum Commands {
 fn gensign() {
     let signature = OpaqueSignature::generate_random();
     println!("{signature}");
+}
+
+fn genkey() {
+    let key = SessionId::random();
+    println!("{}", key.display());
 }
 
 #[derive(Parser)]

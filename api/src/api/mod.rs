@@ -6,6 +6,7 @@ use axum::{
 };
 use mello::kvstorage::KVStorage;
 use tokio::net::TcpListener;
+use tower_http::validate_request::ValidateRequestHeaderLayer;
 
 use crate::{config::Config, opaque::OpaqueSignature, user};
 
@@ -19,6 +20,7 @@ mod state;
 pub async fn serve(config: &Config) -> Result<()> {
     let storage = KVStorage::open(&config.storage)?;
     let signature = OpaqueSignature::new(&config.signature)?;
+    let auth_layer = ValidateRequestHeaderLayer::bearer(&config.auth_token);
 
     let first_invitation = user::create_first_signup_invitation(&storage, &config.admin_user)?;
     if let Some(invitation_code) = first_invitation {
@@ -36,7 +38,10 @@ pub async fn serve(config: &Config) -> Result<()> {
     let state = AppState::new(storage, signature);
     let router = Router::new()
         .route("/api/health", get(health))
-        .route("/api/signup/invitation/:code", get(signup::get_invitation))
+        .route(
+            "/api/signup/invitation/:code",
+            get(signup::get_invitation).layer(auth_layer),
+        )
         .route("/api/signup/start", post(signup::start))
         .route("/api/signup/finish", post(signup::finish))
         .route("/api/signin/start", post(signin::start))
