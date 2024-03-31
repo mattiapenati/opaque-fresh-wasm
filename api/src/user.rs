@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     invitation::{Invitation, InvitationCode},
-    opaque::PasswordFile,
+    opaque::{LoginState, PasswordFile},
     session::SessionId,
     time::{DateTime, Duration},
 };
@@ -14,6 +14,7 @@ use crate::{
 const FIRST_SIGNUP_INVITATION: &str = "option:first-signup-invitation";
 const INVITATION: &str = "invitation";
 const SIGNUP_SESSION: &str = "signup-session";
+const SIGNIN_SESSION: &str = "signin-session";
 const USER: &str = "user";
 
 /// Create the first signup invitation used to register the administrator.
@@ -63,7 +64,7 @@ pub fn signup_invitation_is_valid(
     Ok(invitation.username == username)
 }
 
-/// Signup session
+/// Sign up session
 #[derive(Deserialize, Serialize)]
 pub struct SignupSession {
     #[serde(serialize_with = "InvitationCode::serialize")]
@@ -109,6 +110,50 @@ pub fn pull_signup_session(
     Ok(session)
 }
 
+/// Sign in session
+#[derive(Deserialize, Serialize)]
+pub struct SigninSession {
+    pub state: LoginState,
+    created_at: DateTime,
+}
+
+impl SigninSession {
+    const LIFETIME: Duration = Duration::minutes(1);
+
+    /// Create a new signin session with the given data.
+    pub fn new(state: LoginState) -> Self {
+        Self {
+            state,
+            created_at: DateTime::now(),
+        }
+    }
+
+    /// Check if the signin session is expired.
+    fn is_expired(&self) -> bool {
+        DateTime::now().duration_since(self.created_at) > Self::LIFETIME
+    }
+}
+
+/// Push the signin session in the storage.
+pub fn push_signin_session(storage: &KVStorage, session: SigninSession) -> Result<SessionId> {
+    let session_id = SessionId::random();
+    let key = format!("{SIGNIN_SESSION}:{}", session_id.display());
+    storage.write().set(key, &session)?;
+    Ok(session_id)
+}
+/// Pull the signin session from the storage.
+pub fn pull_signin_session(
+    storage: &KVStorage,
+    session_id: SessionId,
+) -> Result<Option<SigninSession>> {
+    let key = format!("{SIGNIN_SESSION}:{}", session_id.display());
+    let session = storage
+        .write()
+        .extract::<_, SigninSession>(key)?
+        .filter(|session| !session.is_expired());
+    Ok(session)
+}
+
 /// Register a new user, removing the used invitation.
 pub fn register_user(
     storage: &KVStorage,
@@ -128,4 +173,11 @@ pub fn register_user(
 
     tx.commit()?;
     Ok(())
+}
+
+/// Register a new user, removing the used invitation.
+pub fn get_password_file(storage: &KVStorage, username: &str) -> Result<Option<PasswordFile>> {
+    let key = format!("{USER}:{}", username);
+    let password_file = storage.read()?.get(key)?;
+    Ok(password_file)
 }

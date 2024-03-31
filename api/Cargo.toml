@@ -11,7 +11,7 @@ base64ct = "1.6.0"
 clap = { version = "4.5.4", features = ["derive", "wrap_help"] }
 figment = { version = "0.10.15", features = ["env", "toml"] }
 generic-array = "1.0.0"
-opaque-ke = { version = "3.0.0-pre.4", features = ["argon2", "std"] }
+opaque-ke = { version = "3.0.0-pre.4", features = ["argon2", "std", "ristretto255", "ristretto255-voprf"], default-features = false }
 parking_lot = "0.12.1"
 rand = { version = "0.8.5", default-features = false, features = ["getrandom"] }
 rand_chacha = "0.3.1"

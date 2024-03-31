@@ -11,6 +11,7 @@ use crate::{config::Config, opaque::OpaqueServer, user};
 
 use self::state::AppState;
 
+mod signin;
 mod signup;
 mod state;
 
@@ -38,6 +39,8 @@ pub async fn serve(config: &Config) -> Result<()> {
         .route("/api/signup/invitation/:code", get(signup::get_invitation))
         .route("/api/signup/start", post(signup::start))
         .route("/api/signup/finish", post(signup::finish))
+        .route("/api/signin/start", post(signin::start))
+        .route("/api/signin/finish", post(signin::finish))
         .with_state(state);
 
     axum::serve(listener, router).await?;
