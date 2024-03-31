@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use wasm_bindgen::prelude::*;
 
+const MIN_PASSWORD_ENTROPY: f64 = 75.0;
+
 /// Check credentials strength.
 #[wasm_bindgen(js_name = "checkCredentialsStrength")]
 pub fn check_credentials_strength(username: &str, password: &str) -> Result<(), JsError> {
@@ -28,7 +30,7 @@ pub fn check_credentials_strength(username: &str, password: &str) -> Result<(), 
     }
 
     let entropy = charset.len() as f64 * (total_range as f64).log2();
-    if entropy < 75.0 {
+    if entropy < MIN_PASSWORD_ENTROPY {
         return Err(JsError::new("Too weak password!"));
     }
 

@@ -1,20 +1,15 @@
 import { JSX } from "preact";
 import { computed, signal } from "@preact/signals";
 
-import Button from "#components/form/Button.tsx";
 import Label from "#components/form/Label.tsx";
 import Password from "#islands/form/Password.tsx";
 import Text from "#islands/form/Text.tsx";
+import Button from "#components/form/Button.tsx";
 import ErrorBox from "#islands/ErrorBox.tsx";
-import { signup } from "#utils/api.ts";
+import { signin } from "#utils/api.ts";
 
-interface Props {
-  code?: string;
-  username?: string;
-}
-
-export default function SignUpForm(props: Props) {
-  const username = signal(props.username ?? "");
+export default function SignInForm() {
+  const username = signal("");
   const password = signal("");
   const disabled = computed(() =>
     password.value === "" || username.value === ""
@@ -26,12 +21,10 @@ export default function SignUpForm(props: Props) {
 
     try {
       const form = new FormData(event.currentTarget);
-      await signup({
-        code: props.code ?? "",
+      await signin({
         username: form.get("username") as string,
         password: form.get("password") as string,
       });
-      window.location.replace("/signin");
     } catch (err) {
       errorMessage.value = (err instanceof Error)
         ? err.message
@@ -45,7 +38,7 @@ export default function SignUpForm(props: Props) {
       onSubmit={onSubmit}
     >
       <div class="flex flex-row">
-        <h1 class="mx-auto text-2xl font-bold text-gray-900">Sign up</h1>
+        <h1 class="mx-auto text-2xl font-bold text-gray-900">Sign in</h1>
       </div>
       <div class="flex flex-col gap-1">
         <Label for="username">Username or email address</Label>
@@ -53,7 +46,6 @@ export default function SignUpForm(props: Props) {
           id="username"
           name="username"
           value={username}
-          readOnly={!!props.username}
         />
       </div>
       <div class="flex flex-col gap-1">
@@ -66,7 +58,7 @@ export default function SignUpForm(props: Props) {
             type="submit"
             disabled={disabled}
           >
-            Sign up
+            Sign in
           </Button>
         </div>
       </div>
