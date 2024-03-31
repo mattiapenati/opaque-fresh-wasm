@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use crate::{config::Config, opaque::OpaqueServer};
+use crate::{config::Config, opaque::OpaqueSignature};
 
 mod api;
 mod config;
@@ -16,10 +16,7 @@ mod user;
 fn main() -> Result<()> {
     let args = Args::parse();
     match args.command {
-        Commands::Genkey => {
-            let key = OpaqueServer::generate_random_key();
-            println!("{key}");
-        }
+        Commands::Gensign => gensign(),
         Commands::Run(cmd) => {
             let config = Config::load(cmd.config.as_deref())?;
             run(config)?;
@@ -36,10 +33,15 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate a new base64 encoded random private key and print it to standard output.
-    Genkey,
+    /// Generate a new base64 encoded opaque signature.
+    Gensign,
     /// Starts the service and blocks indefinitely
     Run(RunArgs),
+}
+
+fn gensign() {
+    let signature = OpaqueSignature::generate_random();
+    println!("{signature}");
 }
 
 #[derive(Parser)]

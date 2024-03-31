@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use mello::kvstorage::KVStorage;
 
-use crate::opaque::OpaqueServer;
+use crate::opaque::OpaqueSignature;
 
 /// Application state
 #[derive(Clone)]
@@ -12,23 +12,25 @@ pub struct AppState {
 
 struct Inner {
     storage: KVStorage,
-    opaque: OpaqueServer,
+    signature: OpaqueSignature,
 }
 
 impl AppState {
     /// Create a new application state.
-    pub fn new(storage: KVStorage, opaque: OpaqueServer) -> Self {
-        let inner = Inner { storage, opaque };
+    pub fn new(storage: KVStorage, signature: OpaqueSignature) -> Self {
+        let inner = Inner { storage, signature };
         Self {
             inner: Arc::new(inner),
         }
     }
 
+    /// Returns a reference to the storage.
     pub fn storage(&self) -> &KVStorage {
         &self.inner.storage
     }
 
-    pub fn opaque(&self) -> &OpaqueServer {
-        &self.inner.opaque
+    /// Returns a reference to the server signature.
+    pub fn signature(&self) -> &OpaqueSignature {
+        &self.inner.signature
     }
 }

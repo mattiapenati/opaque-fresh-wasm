@@ -63,13 +63,13 @@ pub async fn start(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    let registration_response = state
-        .opaque()
-        .registration_start(&username, registration_request)
-        .map_err(|err| {
-            tracing::error!("failed to start registration of user {username}: {err}",);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let registration_response =
+        opaque::registration_start(state.signature(), &username, registration_request).map_err(
+            |err| {
+                tracing::error!("failed to start registration of user {username}: {err}",);
+                StatusCode::INTERNAL_SERVER_ERROR
+            },
+        )?;
 
     let session = user::SignupSession::new(code);
     let session_id = user::push_signup_session(state.storage(), session).map_err(|err| {
@@ -106,8 +106,8 @@ pub async fn finish(
         })?
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    let password_file = state.opaque().registration_finish(registration_upload);
-    user::register_user(state.storage(), &code, password_file).map_err(|err| {
+    let password_file = opaque::registration_finish(registration_upload);
+    user::register_user_password(state.storage(), &code, password_file).map_err(|err| {
         tracing::error!("failed to save user's password file: {err}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;

@@ -13,7 +13,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub listen_addr: SocketAddr,
-    pub private_key: String,
+    pub signature: String,
     pub admin_user: String,
     pub storage: PathBuf,
 }
@@ -52,7 +52,7 @@ mod tests {
     fn load_configuration_from_environment_variables() {
         Jail::expect_with(|jail| {
             jail.set_env("LISTEN_ADDR", "[::1]:6789");
-            jail.set_env("PRIVATE_KEY", "abcdefgh");
+            jail.set_env("SIGNATURE", "abcdefgh");
             jail.set_env("ADMIN_USER", "xyz");
             jail.set_env("STORAGE", "/tmp/storage.sqlite");
 
@@ -61,7 +61,7 @@ mod tests {
                 config.listen_addr,
                 SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 6789)
             );
-            assert_eq!(config.private_key, "abcdefgh");
+            assert_eq!(config.signature, "abcdefgh");
             assert_eq!(config.admin_user, "xyz");
 
             Ok(())
@@ -75,7 +75,7 @@ mod tests {
                 "config.toml",
                 r#"
                 listen_addr = "[::1]:6789"
-                private_key = "abcdefgh"
+                signature = "abcdefgh"
                 admin_user = "xyz"
                 storage = "/tmp/storage.sqlite"
                 "#,
@@ -87,7 +87,7 @@ mod tests {
                 config.listen_addr,
                 SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 6789)
             );
-            assert_eq!(config.private_key, "abcdefgh");
+            assert_eq!(config.signature, "abcdefgh");
             assert_eq!(config.admin_user, "xyz");
 
             Ok(())

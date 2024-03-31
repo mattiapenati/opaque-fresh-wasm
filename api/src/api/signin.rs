@@ -36,13 +36,13 @@ pub async fn start(
         tracing::info!("user {} not registered", username);
     }
 
-    let (login_response, login_state) = state
-        .opaque()
-        .login_start(&username, password_file, login_request)
-        .map_err(|err| {
-            tracing::error!("failed to start login of user {username}: {err}",);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+    let (login_response, login_state) =
+        opaque::login_start(state.signature(), &username, password_file, login_request).map_err(
+            |err| {
+                tracing::error!("failed to start login of user {username}: {err}",);
+                StatusCode::INTERNAL_SERVER_ERROR
+            },
+        )?;
 
     let session = user::SigninSession::new(login_state);
     let session_id = user::push_signin_session(state.storage(), session).map_err(|err| {
@@ -81,13 +81,10 @@ pub async fn finish(
         })?
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    state
-        .opaque()
-        .login_finish(login_state, login_finalization)
-        .map_err(|err| {
-            tracing::error!("login failed: {err}");
-            StatusCode::UNAUTHORIZED
-        })?;
+    opaque::login_finish(login_state, login_finalization).map_err(|err| {
+        tracing::error!("login failed: {err}");
+        StatusCode::UNAUTHORIZED
+    })?;
 
     Ok(())
 }

@@ -2,7 +2,6 @@ use std::cell::RefCell;
 
 use anyhow::Result;
 use base64ct::{Base64Url, Encoding};
-use opaque_ke::keypair::SecretKey;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -10,13 +9,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// Cipher suite definition
 pub struct CipherSuite;
 
-type KeGroup = opaque_ke::Ristretto255;
-type PrivateKey = opaque_ke::keypair::PrivateKey<KeGroup>;
-type KeyPair = opaque_ke::keypair::KeyPair<KeGroup, PrivateKey>;
-
 impl opaque_ke::CipherSuite for CipherSuite {
     type OprfCs = opaque_ke::Ristretto255;
-    type KeGroup = KeGroup;
+    type KeGroup = opaque_ke::Ristretto255;
     type KeyExchange = opaque_ke::key_exchange::tripledh::TripleDh;
     type Ksf = argon2::Argon2<'static>;
 }
@@ -25,87 +20,87 @@ thread_local! {
     static RNG: RefCell<ChaChaRng> = RefCell::new(ChaChaRng::from_entropy());
 }
 
-pub struct OpaqueServer {
-    setup: opaque_ke::ServerSetup<CipherSuite>,
+/// Server signature
+pub struct OpaqueSignature {
+    server_setup: opaque_ke::ServerSetup<CipherSuite>,
 }
 
-impl OpaqueServer {
-    /// Generate a new base64 encoded random private key
-    pub fn generate_random_key() -> String {
+impl OpaqueSignature {
+    /// Generate a new random server signature.
+    pub fn generate_random() -> String {
         let server_setup = RNG.with_borrow_mut(opaque_ke::ServerSetup::<CipherSuite>::new);
-        let private_key = server_setup.keypair().private();
-        let serialized_key = private_key.serialize();
-        base64ct::Base64Url::encode_string(&serialized_key)
+        let signature = server_setup.serialize();
+        Base64Url::encode_string(&signature)
     }
 
-    pub fn new(key: &str) -> Self {
-        let serialized_key = Base64Url::decode_vec(key).expect("a base64 encoded private key");
-        let private_key = PrivateKey::deserialize(&serialized_key).expect("a valid private key");
-        let key_pair = KeyPair::from_private_key(private_key).expect("a valid key");
-        let setup = RNG.with_borrow_mut(|rng| opaque_ke::ServerSetup::new_with_key(rng, key_pair));
-        Self { setup }
+    /// Create a new signature.
+    pub fn new(signature: &str) -> Result<Self> {
+        let signature = Base64Url::decode_vec(signature)?;
+        let server_setup = opaque_ke::ServerSetup::<CipherSuite>::deserialize(&signature)?;
+        Ok(Self { server_setup })
     }
+}
 
-    /// From the client's blinded password returns a response to be sent back to the client.
-    pub fn registration_start(
-        &self,
-        username: &str,
-        request: RegistrationRequest,
-    ) -> Result<RegistrationResponse> {
-        let server_registration_start = opaque_ke::ServerRegistration::start(
-            &self.setup,
-            request.message,
+///
+/// From the client's blinded password returns a response to be sent back to the client.
+pub fn registration_start(
+    signature: &OpaqueSignature,
+    username: &str,
+    request: RegistrationRequest,
+) -> Result<RegistrationResponse> {
+    let server_registration_start = opaque_ke::ServerRegistration::start(
+        &signature.server_setup,
+        request.message,
+        username.as_bytes(),
+    )?;
+
+    let message = server_registration_start.message;
+
+    Ok(RegistrationResponse { message })
+}
+
+/// Finish the registration process and generate a password file.
+pub fn registration_finish(upload: RegistrationUpload) -> PasswordFile {
+    let registration = opaque_ke::ServerRegistration::finish(upload.message);
+    PasswordFile { registration }
+}
+
+/// From the client's bindled password returns a response to be sent back to the client.
+pub fn login_start(
+    signature: &OpaqueSignature,
+    username: &str,
+    password_file: Option<PasswordFile>,
+    request: LoginRequest,
+) -> Result<(LoginResponse, LoginState)> {
+    let params = opaque_ke::ServerLoginStartParameters::default();
+    let registration = password_file.map(|pf| pf.registration);
+    let credential_request = request.message;
+
+    let server_login = RNG.with_borrow_mut(|rng| {
+        opaque_ke::ServerLogin::start(
+            rng,
+            &signature.server_setup,
+            registration,
+            credential_request,
             username.as_bytes(),
-        )?;
+            params,
+        )
+    })?;
 
-        let message = server_registration_start.message;
+    let login_response = LoginResponse {
+        message: server_login.message,
+    };
+    let login_state = LoginState {
+        state: server_login.state,
+    };
 
-        Ok(RegistrationResponse { message })
-    }
+    Ok((login_response, login_state))
+}
 
-    /// Finish the registration process and generate a password file.
-    pub fn registration_finish(&self, upload: RegistrationUpload) -> PasswordFile {
-        let registration = opaque_ke::ServerRegistration::finish(upload.message);
-        PasswordFile { registration }
-    }
-
-    /// From the client's bindled password returns a response to be sent back to the client.
-    pub fn login_start(
-        &self,
-        username: &str,
-        password_file: Option<PasswordFile>,
-        request: LoginRequest,
-    ) -> Result<(LoginResponse, LoginState)> {
-        let params = opaque_ke::ServerLoginStartParameters::default();
-        let registration = password_file.map(|pf| pf.registration);
-        let credential_request = request.message;
-
-        let server_login = RNG.with_borrow_mut(|rng| {
-            opaque_ke::ServerLogin::start(
-                rng,
-                &self.setup,
-                registration,
-                credential_request,
-                username.as_bytes(),
-                params,
-            )
-        })?;
-
-        let login_response = LoginResponse {
-            message: server_login.message,
-        };
-        let login_state = LoginState {
-            state: server_login.state,
-        };
-
-        Ok((login_response, login_state))
-    }
-
-    /// Check the client's authentication
-    pub fn login_finish(&self, state: LoginState, message: LoginFinalization) -> Result<()> {
-        state.state.finish(message.message)?;
-        Ok(())
-    }
+/// Check the client's authentication
+pub fn login_finish(state: LoginState, message: LoginFinalization) -> Result<()> {
+    state.state.finish(message.message)?;
+    Ok(())
 }
 
 /// Client registration request

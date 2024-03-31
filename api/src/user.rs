@@ -15,7 +15,7 @@ const FIRST_SIGNUP_INVITATION: &str = "option:first-signup-invitation";
 const INVITATION: &str = "invitation";
 const SIGNUP_SESSION: &str = "signup-session";
 const SIGNIN_SESSION: &str = "signin-session";
-const USER: &str = "user";
+const PASSWORD: &str = "password";
 
 /// Create the first signup invitation used to register the administrator.
 pub fn create_first_signup_invitation(
@@ -155,7 +155,7 @@ pub fn pull_signin_session(
 }
 
 /// Register a new user, removing the used invitation.
-pub fn register_user(
+pub fn register_user_password(
     storage: &KVStorage,
     code: &InvitationCode,
     password_file: PasswordFile,
@@ -168,7 +168,7 @@ pub fn register_user(
         .extract::<_, Invitation>(key)?
         .ok_or_else(|| anyhow!("invitation does not exist"))?;
 
-    let key = format!("{USER}:{}", invitation.username);
+    let key = format!("{PASSWORD}:{}", invitation.username);
     tx.set(key, &password_file)?;
 
     tx.commit()?;
@@ -177,7 +177,7 @@ pub fn register_user(
 
 /// Register a new user, removing the used invitation.
 pub fn get_password_file(storage: &KVStorage, username: &str) -> Result<Option<PasswordFile>> {
-    let key = format!("{USER}:{}", username);
+    let key = format!("{PASSWORD}:{}", username);
     let password_file = storage.read()?.get(key)?;
     Ok(password_file)
 }

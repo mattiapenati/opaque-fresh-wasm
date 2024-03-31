@@ -7,7 +7,7 @@ use axum::{
 use mello::kvstorage::KVStorage;
 use tokio::net::TcpListener;
 
-use crate::{config::Config, opaque::OpaqueServer, user};
+use crate::{config::Config, opaque::OpaqueSignature, user};
 
 use self::state::AppState;
 
@@ -18,7 +18,7 @@ mod state;
 /// Launch the management server listening on the given port
 pub async fn serve(config: &Config) -> Result<()> {
     let storage = KVStorage::open(&config.storage)?;
-    let opaque = OpaqueServer::new(&config.private_key);
+    let signature = OpaqueSignature::new(&config.signature)?;
 
     let first_invitation = user::create_first_signup_invitation(&storage, &config.admin_user)?;
     if let Some(invitation_code) = first_invitation {
@@ -33,7 +33,7 @@ pub async fn serve(config: &Config) -> Result<()> {
     let local_addr = listener.local_addr()?;
     tracing::info!("listening on {}", local_addr);
 
-    let state = AppState::new(storage, opaque);
+    let state = AppState::new(storage, signature);
     let router = Router::new()
         .route("/api/health", get(health))
         .route("/api/signup/invitation/:code", get(signup::get_invitation))
