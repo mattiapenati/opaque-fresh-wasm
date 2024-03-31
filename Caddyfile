@@ -1,0 +1,9 @@
+localhost {
+	@publicApi path /api/signup/start /api/signup/finish /api/signin/start /api/signin/finish
+	reverse_proxy @publicApi localhost:8080
+	reverse_proxy localhost:8000
+	log {
+		format console
+		output stderr
+	}
+}
