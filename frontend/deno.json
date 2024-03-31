@@ -34,6 +34,7 @@
     "$std/": "https://deno.land/std@0.211.0/",
     "#components/": "./components/",
     "#islands/": "./islands/",
+    "#plugins/": "./plugins/",
     "#utils/": "./utils/"
   },
   "compilerOptions": {

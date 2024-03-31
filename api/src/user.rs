@@ -1,6 +1,7 @@
 //! User management
 
 use anyhow::{anyhow, Result};
+use cookie::Cookie;
 use mello::kvstorage::KVStorage;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,7 @@ const FIRST_SIGNUP_INVITATION: &str = "option:first-signup-invitation";
 const INVITATION: &str = "invitation";
 const SIGNUP_SESSION: &str = "signup-session";
 const SIGNIN_SESSION: &str = "signin-session";
+const SESSION: &str = "session";
 const PASSWORD: &str = "password";
 
 /// Create the first signup invitation used to register the administrator.
@@ -46,10 +48,15 @@ pub fn get_signup_invitation(
     code: &InvitationCode,
 ) -> Result<Option<Invitation>> {
     let key = format!("{INVITATION}:{}", code.display());
-    Ok(storage
-        .read()
-        .and_then(|conn| conn.get::<_, Invitation>(key))?
-        .filter(|invitation| !invitation.is_expired()))
+    let invitation = storage.read()?.get::<_, Invitation>(&key)?;
+
+    // keep the storage clean
+    if matches!(&invitation, Some(invitation) if invitation.is_expired()) {
+        storage.write().del(&key)?;
+        return Ok(None);
+    }
+
+    Ok(invitation)
 }
 
 /// Check if the invitation exists and associated to the given user.
@@ -113,6 +120,7 @@ pub fn pull_signup_session(
 /// Sign in session
 #[derive(Deserialize, Serialize)]
 pub struct SigninSession {
+    pub username: String,
     pub state: LoginState,
     created_at: DateTime,
 }
@@ -121,8 +129,9 @@ impl SigninSession {
     const LIFETIME: Duration = Duration::minutes(1);
 
     /// Create a new signin session with the given data.
-    pub fn new(state: LoginState) -> Self {
+    pub fn new(username: String, state: LoginState) -> Self {
         Self {
+            username,
             state,
             created_at: DateTime::now(),
         }
@@ -180,4 +189,58 @@ pub fn get_password_file(storage: &KVStorage, username: &str) -> Result<Option<P
     let key = format!("{PASSWORD}:{}", username);
     let password_file = storage.read()?.get(key)?;
     Ok(password_file)
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Session {
+    pub username: String,
+    created_at: DateTime,
+}
+
+impl Session {
+    pub const LIFETIME: Duration = Duration::days(7);
+    pub const COOKIE: &'static str = "FRESH_SESSION";
+
+    /// Check if the session is expired.
+    fn is_expired(&self) -> bool {
+        DateTime::now().duration_since(self.created_at) > Self::LIFETIME
+    }
+
+    /// Create the session cookie.
+    fn create_cookie(session_id: SessionId) -> String {
+        let value = session_id.display().to_string();
+        Cookie::build((Self::COOKIE, value))
+            .secure(true)
+            .http_only(true)
+            .same_site(cookie::SameSite::Strict)
+            .path("/")
+            .max_age(Self::LIFETIME.into())
+            .build()
+            .to_string()
+    }
+}
+
+/// Start a new session and return the cookie that should be set by the client.
+pub fn start_new_session(storage: &KVStorage, username: String) -> Result<String> {
+    let session_id = SessionId::random();
+    let session = Session {
+        username,
+        created_at: DateTime::now(),
+    };
+
+    let key = format!("{SESSION}:{}", session_id.display());
+    storage.write().set(key, &session)?;
+
+    Ok(Session::create_cookie(session_id))
+}
+
+/// Retrieve the session.
+pub fn get_session(storage: &KVStorage, session_id: SessionId) -> Result<Option<Session>> {
+    let key = format!("{SESSION}:{}", session_id.display());
+    let session = storage
+        .read()?
+        .get::<_, Session>(key)?
+        .filter(|session| !session.is_expired());
+
+    Ok(session)
 }

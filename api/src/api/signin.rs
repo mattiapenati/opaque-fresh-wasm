@@ -1,4 +1,9 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::State,
+    http::{header, StatusCode},
+    response::IntoResponse,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{opaque, session::SessionId, user};
@@ -32,9 +37,6 @@ pub async fn start(
         tracing::error!("failed to retrieve password file: {err}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    if password_file.is_none() {
-        tracing::info!("user {} not registered", username);
-    }
 
     let (login_response, login_state) =
         opaque::login_start(state.signature(), &username, password_file, login_request).map_err(
@@ -44,7 +46,7 @@ pub async fn start(
             },
         )?;
 
-    let session = user::SigninSession::new(login_state);
+    let session = user::SigninSession::new(username, login_state);
     let session_id = user::push_signin_session(state.storage(), session).map_err(|err| {
         tracing::error!("failed to push signin session: {err}");
         StatusCode::INTERNAL_SERVER_ERROR
@@ -66,14 +68,16 @@ pub struct FinishReq {
 pub async fn finish(
     State(state): State<AppState>,
     Json(req): Json<FinishReq>,
-) -> Result<Json<()>, StatusCode> {
+) -> Result<impl IntoResponse, StatusCode> {
     let FinishReq {
         session: session_id,
         message: login_finalization,
     } = req;
 
     let user::SigninSession {
-        state: login_state, ..
+        username,
+        state: login_state,
+        ..
     } = user::pull_signin_session(state.storage(), session_id)
         .map_err(|err| {
             tracing::error!("failed to retrieve signin session: {err}");
@@ -86,5 +90,12 @@ pub async fn finish(
         StatusCode::UNAUTHORIZED
     })?;
 
-    Ok(Json(()))
+    let cookie = user::start_new_session(state.storage(), username).map_err(|err| {
+        tracing::error!("failed to create a new session: {err}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let headers = [(header::SET_COOKIE, cookie)];
+    let body = Json(());
+    Ok((headers, body))
 }

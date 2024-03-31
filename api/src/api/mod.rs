@@ -12,6 +12,7 @@ use crate::{config::Config, opaque::OpaqueSignature, user};
 
 use self::state::AppState;
 
+mod session;
 mod signin;
 mod signup;
 mod state;
@@ -39,8 +40,12 @@ pub async fn serve(config: &Config) -> Result<()> {
     let router = Router::new()
         .route("/api/health", get(health))
         .route(
+            "/api/session/:id",
+            get(session::get_session).layer(auth_layer.clone()),
+        )
+        .route(
             "/api/signup/invitation/:code",
-            get(signup::get_invitation).layer(auth_layer),
+            get(signup::get_invitation).layer(auth_layer.clone()),
         )
         .route("/api/signup/start", post(signup::start))
         .route("/api/signup/finish", post(signup::finish))

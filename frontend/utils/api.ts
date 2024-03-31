@@ -131,3 +131,8 @@ export interface SigninFinishReq {
   session: string;
   message: string;
 }
+
+/** Session information */
+export interface SessionRes {
+  username: string;
+}

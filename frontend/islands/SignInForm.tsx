@@ -25,6 +25,7 @@ export default function SignInForm() {
         username: form.get("username") as string,
         password: form.get("password") as string,
       });
+      errorMessage.value = undefined;
       window.location.href = "/";
     } catch (err) {
       errorMessage.value = (err instanceof Error)

@@ -13,6 +13,11 @@ pub struct DateTime(#[serde(with = "time::serde::rfc3339")] time::OffsetDateTime
 pub struct Duration(time::Duration);
 
 impl Duration {
+    /// Create a new `Duration` with the given number of days.
+    pub const fn days(days: i64) -> Self {
+        Self(time::Duration::days(days))
+    }
+
     /// Create a new `Duration` with the given number of hours.
     pub const fn hours(hours: i64) -> Self {
         Self(time::Duration::hours(hours))
@@ -81,5 +86,11 @@ impl PartialOrd for Duration {
 impl Ord for Duration {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.cmp(&other.0)
+    }
+}
+
+impl From<Duration> for time::Duration {
+    fn from(value: Duration) -> Self {
+        value.0
     }
 }

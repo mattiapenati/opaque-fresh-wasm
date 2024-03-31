@@ -7,12 +7,12 @@ import {
 import {
   api,
   SigninFinishReq,
+  SigninStartReq,
+  SigninStartRes,
   SignupFinishReq,
   SignupStartReq,
   SignupStartRes,
 } from "#utils/api.ts";
-import { SigninStartRes } from "#utils/api.ts";
-import { SigninStartReq } from "#utils/api.ts";
 
 /** Sign up arguments */
 export interface SignupArgs {
