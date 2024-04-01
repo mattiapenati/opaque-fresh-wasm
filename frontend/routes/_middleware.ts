@@ -22,12 +22,13 @@ export async function handler(
   const isExcludedRoute = <T>(ctx: FreshContext<T>) =>
     excludedPath.includes(ctx.url.pathname) || ctx.destination !== "route";
 
+  // extract cookie, the signature is removed
   const cookies = getCookies(req.headers);
-  const sessionId = cookies["FRESH_SESSION"];
+  const sessionId = cookies["SESSIONID"];
 
   // session cookie is missing, if the page is an excluded route the page is
   // loaded otherwise redirected to login page
-  if (sessionId === undefined) {
+  if (!sessionId) {
     if (isExcludedRoute(ctx)) {
       return await ctx.next();
     } else {
@@ -45,7 +46,7 @@ export async function handler(
       status: 307,
       headers: {
         "location": ctx.url.pathname,
-        "set-cookie": "FRESH_SESSION=; Path=/; Max-Age=0",
+        "set-cookie": "SESSIONID=; Path=/; Max-Age=0",
       },
     });
   }

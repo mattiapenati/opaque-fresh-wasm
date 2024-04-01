@@ -13,7 +13,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub listen_addr: SocketAddr,
-    pub signature: String,
+    pub opaque_signature: String,
     pub admin_user: String,
     pub storage: PathBuf,
     pub auth_token: String,
@@ -53,7 +53,7 @@ mod tests {
     fn load_configuration_from_environment_variables() {
         Jail::expect_with(|jail| {
             jail.set_env("LISTEN_ADDR", "[::1]:6789");
-            jail.set_env("SIGNATURE", "abcdefgh");
+            jail.set_env("OPAQUE_SIGNATURE", "abcdefgh");
             jail.set_env("ADMIN_USER", "xyz");
             jail.set_env("STORAGE", "/tmp/storage.sqlite");
             jail.set_env("AUTH_TOKEN", "123abc456");
@@ -63,7 +63,7 @@ mod tests {
                 config.listen_addr,
                 SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 6789)
             );
-            assert_eq!(config.signature, "abcdefgh");
+            assert_eq!(config.opaque_signature, "abcdefgh");
             assert_eq!(config.admin_user, "xyz");
             assert_eq!(config.auth_token, "123abc456");
 
@@ -78,7 +78,7 @@ mod tests {
                 "config.toml",
                 r#"
                 listen_addr = "[::1]:6789"
-                signature = "abcdefgh"
+                opaque_signature = "abcdefgh"
                 admin_user = "xyz"
                 storage = "/tmp/storage.sqlite"
                 auth_token = "123abc456"
@@ -91,7 +91,7 @@ mod tests {
                 config.listen_addr,
                 SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 6789)
             );
-            assert_eq!(config.signature, "abcdefgh");
+            assert_eq!(config.opaque_signature, "abcdefgh");
             assert_eq!(config.admin_user, "xyz");
             assert_eq!(config.auth_token, "123abc456");
 

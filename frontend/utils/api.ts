@@ -20,6 +20,7 @@ interface ApiRequest<T> {
   method: string;
   path: string;
   body?: T;
+  session?: string;
 }
 
 export class Api {

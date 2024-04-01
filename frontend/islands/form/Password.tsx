@@ -35,18 +35,14 @@ export default function Password(props: Props) {
           class="appearance-none cursor-pointer opacity-0 row-start-1 col-start-1 w-full h-full"
         />
         <div class="flex overflow-hidden row-start-1 col-start-1">
-          <div
+          <RiEyeLine
             data-show={showPassword}
-            class="data-[show=true]:hidden data-[show=false]:block"
-          >
-            <RiEyeLine class="w-full h-full fill-gray-900" />
-          </div>
-          <div
+            class="w-full h-full fill-gray-900 data-[show=true]:hidden data-[show=false]:block"
+          />
+          <RiEyeOffLine
             data-hide={!showPassword}
-            class="data-[hide=true]:hidden data-[hide=false]:block"
-          >
-            <RiEyeOffLine class="w-full h-full fill-gray-900" />
-          </div>
+            class="w-full h-full fill-gray-900 data-[hide=true]:hidden data-[hide=false]:block"
+          />
         </div>
       </label>
     </div>

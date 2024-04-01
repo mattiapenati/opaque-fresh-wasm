@@ -1,5 +1,6 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, str::FromStr};
 
+use anyhow::ensure;
 use base64ct::{Base64Url, Encoding};
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaChaRng;
@@ -53,22 +54,27 @@ impl<'a> std::fmt::Display for DisplaySessionId<'a> {
     }
 }
 
+impl FromStr for SessionId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut bytes = [0_u8; SESSION_BYTES];
+        let decoded_bytes = Base64Url::decode(s, &mut bytes)?.len();
+        ensure!(
+            decoded_bytes == SESSION_BYTES,
+            format!("expected a string with {SESSION_BYTES} bytes base64 encoded")
+        );
+
+        Ok(Self { bytes })
+    }
+}
+
 impl<'de> serde::Deserialize<'de> for SessionId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let encoded_bytes: &str = serde::Deserialize::deserialize(deserializer)?;
-        let mut bytes = [0_u8; SESSION_BYTES];
-        let decoded_bytes = Base64Url::decode(encoded_bytes, &mut bytes)
-            .map_err(serde::de::Error::custom)?
-            .len();
-        if decoded_bytes != SESSION_BYTES {
-            return Err(serde::de::Error::invalid_length(
-                decoded_bytes,
-                &format!("base64 encoded {SESSION_BYTES} bytes").as_str(),
-            ));
-        }
-        Ok(Self { bytes })
+        encoded_bytes.parse().map_err(serde::de::Error::custom)
     }
 }

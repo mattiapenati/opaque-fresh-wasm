@@ -21,12 +21,10 @@ export default function Text(props: Props) {
         }}
         class="block flex-1 p-0 m-0 border-0 bg-transparent text-gray-900 focus:ring-0"
       />
-      <div
+      <RiLockLine
         data-readonly={props.readOnly ?? false}
-        class="h-5 w-5 data-[readonly=true]:block data-[readonly=false]:hidden"
-      >
-        <RiLockLine class="h-full w-full fill-gray-900" />
-      </div>
+        class="h-5 w-5 fill-gray-900 data-[readonly=true]:block data-[readonly=false]:hidden"
+      />
     </div>
   );
 }

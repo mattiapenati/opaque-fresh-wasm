@@ -13,6 +13,9 @@ pub struct DateTime(#[serde(with = "time::serde::rfc3339")] time::OffsetDateTime
 pub struct Duration(time::Duration);
 
 impl Duration {
+    /// Zero duration.
+    pub const ZERO: Duration = Duration(time::Duration::ZERO);
+
     /// Create a new `Duration` with the given number of days.
     pub const fn days(days: i64) -> Self {
         Self(time::Duration::days(days))

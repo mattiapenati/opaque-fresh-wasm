@@ -7,6 +7,8 @@ use axum::{
 use mello::kvstorage::KVStorage;
 use tokio::net::TcpListener;
 use tower_http::validate_request::ValidateRequestHeaderLayer;
+use tower_otel::trace::HttpLayer;
+use tracing::Level;
 
 use crate::{config::Config, opaque::OpaqueSignature, user};
 
@@ -14,13 +16,14 @@ use self::state::AppState;
 
 mod session;
 mod signin;
+mod signout;
 mod signup;
 mod state;
 
 /// Launch the management server listening on the given port
 pub async fn serve(config: &Config) -> Result<()> {
     let storage = KVStorage::open(&config.storage)?;
-    let signature = OpaqueSignature::new(&config.signature)?;
+    let signature = OpaqueSignature::new(&config.opaque_signature)?;
     let auth_layer = ValidateRequestHeaderLayer::bearer(&config.auth_token);
 
     let first_invitation = user::create_first_signup_invitation(&storage, &config.admin_user)?;
@@ -51,7 +54,9 @@ pub async fn serve(config: &Config) -> Result<()> {
         .route("/api/signup/finish", post(signup::finish))
         .route("/api/signin/start", post(signin::start))
         .route("/api/signin/finish", post(signin::finish))
-        .with_state(state);
+        .route("/api/signout", get(signout::signout))
+        .with_state(state)
+        .layer(HttpLayer::server(Level::INFO));
 
     axum::serve(listener, router).await?;
     Ok(())

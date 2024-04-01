@@ -1,9 +1,5 @@
-use axum::{
-    extract::State,
-    http::{header, StatusCode},
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum_extra::extract::CookieJar;
 use serde::{Deserialize, Serialize};
 
 use crate::{opaque, session::SessionId, user};
@@ -66,6 +62,7 @@ pub struct FinishReq {
 
 /// Finish login.
 pub async fn finish(
+    jar: CookieJar,
     State(state): State<AppState>,
     Json(req): Json<FinishReq>,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -95,7 +92,7 @@ pub async fn finish(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let headers = [(header::SET_COOKIE, cookie)];
+    let jar = jar.add(cookie);
     let body = Json(());
-    Ok((headers, body))
+    Ok((jar, body))
 }

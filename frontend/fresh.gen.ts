@@ -11,6 +11,7 @@ import * as $signup from "./routes/signup.tsx";
 import * as $ErrorBox from "./islands/ErrorBox.tsx";
 import * as $SignInForm from "./islands/SignInForm.tsx";
 import * as $SignUpForm from "./islands/SignUpForm.tsx";
+import * as $Signout from "./islands/Signout.tsx";
 import * as $form_Password from "./islands/form/Password.tsx";
 import * as $form_Text from "./islands/form/Text.tsx";
 import { type Manifest } from "$fresh/server.ts";
@@ -28,6 +29,7 @@ const manifest = {
     "./islands/ErrorBox.tsx": $ErrorBox,
     "./islands/SignInForm.tsx": $SignInForm,
     "./islands/SignUpForm.tsx": $SignUpForm,
+    "./islands/Signout.tsx": $Signout,
     "./islands/form/Password.tsx": $form_Password,
     "./islands/form/Text.tsx": $form_Text,
   },

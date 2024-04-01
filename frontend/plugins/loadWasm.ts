@@ -1,11 +1,12 @@
 import { Plugin, PluginMiddleware } from "$fresh/server.ts";
 import * as path from "$std/path/mod.ts";
+import * as fs from "$std/fs/mod.ts";
 
 export default function loadWasm(wasmPath: string): Plugin {
   const projectDir = Deno.cwd();
   const middlewares: Plugin["middlewares"] = [];
 
-  const wasmMiddleware: PluginMiddleware = {
+  const devWasmMiddleware: PluginMiddleware = {
     path: "/",
     middleware: {
       handler: async (_req, ctx) => {
@@ -40,13 +41,44 @@ export default function loadWasm(wasmPath: string): Plugin {
     },
   };
 
+  const productionWasmMiddleware: PluginMiddleware = {
+    path: "/_frsh",
+    middleware: {
+      handler: (_req, ctx) => {
+        const filename = path.basename(ctx.url.pathname);
+        if (filename.endsWith(".wasm")) {
+          return new Response(null, {
+            status: 308,
+            headers: { location: `/${filename}` },
+          });
+        }
+        return ctx.next();
+      },
+    },
+  };
+
   return {
     name: "loadWasm",
     configResolved: (config) => {
-      if (config.dev) {
-        middlewares.push(wasmMiddleware);
-      }
+      middlewares.push(
+        config.dev ? devWasmMiddleware : productionWasmMiddleware,
+      );
     },
     middlewares,
+    async buildStart(config) {
+      const outDir = path.join(config.build.outDir, "static");
+      const wasmDir = path.join(projectDir, wasmPath);
+      const wasmFiles = fs.walk(wasmDir, {
+        exts: ["wasm"],
+        includeDirs: false,
+        includeFiles: true,
+      });
+      for await (const file of wasmFiles) {
+        const relFilePath = path.relative(wasmDir, file.path);
+        const outPath = path.join(outDir, relFilePath);
+        await Deno.mkdir(path.dirname(outPath), { recursive: true });
+        await Deno.copyFile(file.path, outPath);
+      }
+    },
   };
 }

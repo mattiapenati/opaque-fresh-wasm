@@ -199,7 +199,7 @@ pub struct Session {
 
 impl Session {
     pub const LIFETIME: Duration = Duration::days(7);
-    pub const COOKIE: &'static str = "FRESH_SESSION";
+    pub const COOKIE: &'static str = "SESSIONID";
 
     /// Check if the session is expired.
     fn is_expired(&self) -> bool {
@@ -207,7 +207,7 @@ impl Session {
     }
 
     /// Create the session cookie.
-    fn create_cookie(session_id: SessionId) -> String {
+    fn create_cookie(session_id: SessionId) -> Cookie<'static> {
         let value = session_id.display().to_string();
         Cookie::build((Self::COOKIE, value))
             .secure(true)
@@ -216,12 +216,19 @@ impl Session {
             .path("/")
             .max_age(Self::LIFETIME.into())
             .build()
-            .to_string()
+    }
+
+    /// Remove cookie.
+    fn remove_cookie() -> Cookie<'static> {
+        Cookie::build(Self::COOKIE)
+            .path("/")
+            .max_age(Duration::ZERO.into())
+            .build()
     }
 }
 
 /// Start a new session and return the cookie that should be set by the client.
-pub fn start_new_session(storage: &KVStorage, username: String) -> Result<String> {
+pub fn start_new_session(storage: &KVStorage, username: String) -> Result<Cookie<'static>> {
     let session_id = SessionId::random();
     let session = Session {
         username,
@@ -232,6 +239,13 @@ pub fn start_new_session(storage: &KVStorage, username: String) -> Result<String
     storage.write().set(key, &session)?;
 
     Ok(Session::create_cookie(session_id))
+}
+
+/// End the session and return the cookie that should be set by the client.
+pub fn finish_session(storage: &KVStorage, session_id: SessionId) -> Result<Cookie<'static>> {
+    let key = format!("{SESSION}:{}", session_id.display());
+    storage.write().del(key)?;
+    Ok(Session::remove_cookie())
 }
 
 /// Retrieve the session.

@@ -1,5 +1,5 @@
 localhost {
-	@publicApi path /api/signup/start /api/signup/finish /api/signin/start /api/signin/finish
+	@publicApi path /api/signup/start /api/signup/finish /api/signin/start /api/signin/finish /api/signout
 	reverse_proxy @publicApi localhost:8080
 	reverse_proxy localhost:8000
 	log {

@@ -1,3 +1,9 @@
+import Signout from "#islands/Signout.tsx";
+
 export default function Index() {
-  return <></>;
+  return (
+    <div class="p-4">
+      <Signout />
+    </div>
+  );
 }
