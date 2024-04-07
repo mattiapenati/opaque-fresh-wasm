@@ -33,7 +33,7 @@ features = ["cookie"]
 
 [dependencies.mello]
 git = "https://github.com/mattiapenati/mello.git"
-features = ["kvstorage", "trace"]
+features = ["kvstorage", "reverse-proxy", "trace"]
 
 [dependencies.opaque-ke]
 version = "3.0.0-pre.4"

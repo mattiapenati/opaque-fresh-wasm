@@ -1,10 +1,12 @@
+use std::net::Ipv4Addr;
+
 use anyhow::Result;
 use axum::{
     http::StatusCode,
     routing::{get, post},
     Router,
 };
-use mello::kvstorage::KVStorage;
+use mello::{kvstorage::KVStorage, reverse_proxy::ReverseProxy};
 use tokio::net::TcpListener;
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 use tower_otel::trace::HttpLayer;
@@ -39,6 +41,9 @@ pub async fn serve(config: &Config) -> Result<()> {
     let local_addr = listener.local_addr()?;
     tracing::info!("listening on {}", local_addr);
 
+    let fresh_addr = (Ipv4Addr::LOCALHOST, 8000);
+    let reverse_proxy = ReverseProxy::new(fresh_addr);
+
     let state = AppState::new(storage, signature);
     let router = Router::new()
         .route("/api/health", get(health))
@@ -55,6 +60,7 @@ pub async fn serve(config: &Config) -> Result<()> {
         .route("/api/signin/start", post(signin::start))
         .route("/api/signin/finish", post(signin::finish))
         .route("/api/signout", get(signout::signout))
+        .fallback_service(reverse_proxy)
         .with_state(state)
         .layer(HttpLayer::server(Level::INFO));
 
