@@ -1,9 +1,6 @@
-use std::cell::RefCell;
-
 use anyhow::Result;
 use base64ct::{Base64Url, Encoding};
-use rand::SeedableRng;
-use rand_chacha::ChaChaRng;
+use rand_core::CryptoRngCore;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Cipher suite definition
@@ -16,10 +13,6 @@ impl opaque_ke::CipherSuite for CipherSuite {
     type Ksf = argon2::Argon2<'static>;
 }
 
-thread_local! {
-    static RNG: RefCell<ChaChaRng> = RefCell::new(ChaChaRng::from_entropy());
-}
-
 /// Server signature
 pub struct OpaqueSignature {
     server_setup: opaque_ke::ServerSetup<CipherSuite>,
@@ -27,8 +20,8 @@ pub struct OpaqueSignature {
 
 impl OpaqueSignature {
     /// Generate a new random server signature.
-    pub fn generate_random() -> String {
-        let server_setup = RNG.with_borrow_mut(opaque_ke::ServerSetup::<CipherSuite>::new);
+    pub fn generate<R: CryptoRngCore>(rng: &mut R) -> String {
+        let server_setup = opaque_ke::ServerSetup::<CipherSuite>::new(rng);
         let signature = server_setup.serialize();
         Base64Url::encode_string(&signature)
     }
@@ -66,7 +59,8 @@ pub fn registration_finish(upload: RegistrationUpload) -> PasswordFile {
 }
 
 /// From the client's bindled password returns a response to be sent back to the client.
-pub fn login_start(
+pub fn login_start<R: CryptoRngCore>(
+    rng: &mut R,
     signature: &OpaqueSignature,
     username: &str,
     password_file: Option<PasswordFile>,
@@ -76,16 +70,14 @@ pub fn login_start(
     let registration = password_file.map(|pf| pf.registration);
     let credential_request = request.message;
 
-    let server_login = RNG.with_borrow_mut(|rng| {
-        opaque_ke::ServerLogin::start(
-            rng,
-            &signature.server_setup,
-            registration,
-            credential_request,
-            username.as_bytes(),
-            params,
-        )
-    })?;
+    let server_login = opaque_ke::ServerLogin::start(
+        rng,
+        &signature.server_setup,
+        registration,
+        credential_request,
+        username.as_bytes(),
+        params,
+    )?;
 
     let login_response = LoginResponse {
         message: server_login.message,

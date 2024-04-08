@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, ops::Add};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Combined date and time with an offset applied.
 #[derive(Clone, Copy, Deserialize, Serialize)]
@@ -41,6 +41,25 @@ impl DateTime {
     /// Returns the amount of time elapsed.
     pub fn duration_since(&self, earlier: DateTime) -> Duration {
         Duration(self.0 - earlier.0)
+    }
+
+    /// Serialize to unix timestamp, in millisecods for JS compatibility.
+    pub fn serialize_unix_timestamp<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let unix_timestamp = self.0.unix_timestamp_nanos() / 1_000_000;
+        serializer.serialize_i64(unix_timestamp as i64)
+    }
+
+    /// Deserialize from unix timestamp, in milliseconds for JS compatibility.
+    pub fn deserialize_unix_timestamp<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
+        let unix_timestamp = i64::deserialize(deserializer)? as i128;
+        let dt =
+            time::OffsetDateTime::from_unix_timestamp_nanos(unix_timestamp * 1_000_000).unwrap();
+        Ok(Self(dt))
     }
 }
 

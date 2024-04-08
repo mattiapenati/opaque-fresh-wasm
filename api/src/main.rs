@@ -2,14 +2,14 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use session::SessionId;
 
-use crate::{config::Config, opaque::OpaqueSignature};
+use crate::{config::Config, invitation::InvitationKey, opaque::OpaqueSignature};
 
 mod api;
 mod config;
 mod invitation;
 mod opaque;
+mod rng;
 mod session;
 mod time;
 mod user;
@@ -17,8 +17,7 @@ mod user;
 fn main() -> Result<()> {
     let args = Args::parse();
     match args.command {
-        Commands::Gensign => gensign(),
-        Commands::Genkey => genkey(),
+        Commands::Genkey { kind } => genkey(kind),
         Commands::Run(cmd) => {
             let config = Config::load(cmd.config.as_deref())?;
             run(config)?;
@@ -35,22 +34,34 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Generate a new base64 encoded opaque signature.
-    Gensign,
     /// Geneate a random key, it can be used for the authentication token.
-    Genkey,
-    /// Starts the service and blocks indefinitely
+    Genkey {
+        #[command(subcommand)]
+        kind: GenkeyKind,
+    },
+    /// Starts the service and blocks indefinitely.
     Run(RunArgs),
 }
 
-fn gensign() {
-    let signature = OpaqueSignature::generate_random();
-    println!("{signature}");
+#[derive(Subcommand)]
+enum GenkeyKind {
+    /// Generate a random key to sign invitation.
+    Invitation,
+    /// Generate a new opaque signature.
+    Signature,
 }
 
-fn genkey() {
-    let key = SessionId::random();
-    println!("{}", key.display());
+fn genkey(kind: GenkeyKind) {
+    match kind {
+        GenkeyKind::Invitation => {
+            let invitation_key = rng::with_crypto_rng(InvitationKey::generate);
+            println!("{}", invitation_key.display());
+        }
+        GenkeyKind::Signature => {
+            let signature = rng::with_crypto_rng(OpaqueSignature::generate);
+            println!("{signature}");
+        }
+    }
 }
 
 #[derive(Parser)]

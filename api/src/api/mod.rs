@@ -12,7 +12,12 @@ use tower_http::validate_request::ValidateRequestHeaderLayer;
 use tower_otel::trace::HttpLayer;
 use tracing::Level;
 
-use crate::{config::Config, opaque::OpaqueSignature, user};
+use crate::{
+    config::Config,
+    invitation::{Invitation, InvitationKey},
+    opaque::OpaqueSignature,
+    user::UserTable,
+};
 
 use self::state::AppState;
 
@@ -25,38 +30,35 @@ mod state;
 /// Launch the management server listening on the given port
 pub async fn serve(config: &Config) -> Result<()> {
     let storage = KVStorage::open(&config.storage)?;
-    let signature = OpaqueSignature::new(&config.opaque_signature)?;
-    let auth_layer = ValidateRequestHeaderLayer::bearer(&config.auth_token);
+    let invitation_key: InvitationKey = config.key.invitation.parse()?;
+    let signature = OpaqueSignature::new(&config.key.opaque)?;
+    let auth_layer = ValidateRequestHeaderLayer::bearer(&config.key.session);
 
-    let first_invitation = user::create_first_signup_invitation(&storage, &config.admin_user)?;
-    if let Some(invitation_code) = first_invitation {
-        tracing::info!(
-            "'{}' invitation code is '{}'",
-            &config.admin_user,
-            invitation_code.display()
-        );
+    // generate an invitation code for the administrator
+    if !storage.user_is_registered(&config.admin)? {
+        let username = &config.admin;
+        let invitation = Invitation::admin(&username);
+        let invitation_code = invitation_key.sign(&invitation);
+        tracing::info!("'{username}' invitation code is '{invitation_code}'");
     }
 
-    let listener = TcpListener::bind(&config.listen_addr).await?;
+    let listener = TcpListener::bind(&config.listen).await?;
     let local_addr = listener.local_addr()?;
     tracing::info!("listening on {}", local_addr);
 
     let fresh_addr = (Ipv4Addr::LOCALHOST, 8000);
     let reverse_proxy = ReverseProxy::new(fresh_addr);
 
-    let state = AppState::new(storage, signature);
+    let signup = post(signup::signup).get_service(reverse_proxy.clone());
+
+    let state = AppState::new(storage, signature, invitation_key);
     let router = Router::new()
         .route("/api/health", get(health))
         .route(
             "/api/session/:id",
             get(session::get_session).layer(auth_layer.clone()),
         )
-        .route(
-            "/api/signup/invitation/:code",
-            get(signup::get_invitation).layer(auth_layer.clone()),
-        )
-        .route("/api/signup/start", post(signup::start))
-        .route("/api/signup/finish", post(signup::finish))
+        .route("/signup", signup)
         .route("/api/signin/start", post(signin::start))
         .route("/api/signin/finish", post(signin::finish))
         .route("/api/signout", get(signout::signout))

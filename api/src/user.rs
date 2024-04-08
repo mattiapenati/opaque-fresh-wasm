@@ -1,81 +1,48 @@
 //! User management
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use cookie::Cookie;
 use mello::kvstorage::KVStorage;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    invitation::{Invitation, InvitationCode},
     opaque::{LoginState, PasswordFile},
     session::SessionId,
     time::{DateTime, Duration},
 };
 
-const FIRST_SIGNUP_INVITATION: &str = "option:first-signup-invitation";
-const INVITATION: &str = "invitation";
 const SIGNUP_SESSION: &str = "signup-session";
 const SIGNIN_SESSION: &str = "signin-session";
 const SESSION: &str = "session";
 const PASSWORD: &str = "password";
 
-/// Create the first signup invitation used to register the administrator.
-pub fn create_first_signup_invitation(
-    storage: &KVStorage,
-    username: &str,
-) -> Result<Option<InvitationCode>> {
-    let mut conn = storage.write();
-    let tx = conn.transaction()?;
+/// Function related to user's table.
+pub trait UserTable {
+    /// Check if the user has been already registered.
+    fn user_is_registered(&self, username: &str) -> Result<bool>;
 
-    if tx.get(FIRST_SIGNUP_INVITATION)?.unwrap_or(false) {
-        return Ok(None);
-    }
-
-    let invitation_code = InvitationCode::random();
-    let invitation = Invitation::new(username);
-    let key = format!("{INVITATION}:{}", invitation_code.display());
-    tx.set(key, &invitation)?;
-
-    tx.set(FIRST_SIGNUP_INVITATION, &true)?;
-    tx.commit()?;
-
-    Ok(Some(invitation_code))
+    /// Register a new user, removing the used invitation.
+    fn register_user_password(&self, username: &str, password_file: PasswordFile) -> Result<()>;
 }
 
-/// Retrieve a valid invitation using its code.
-pub fn get_signup_invitation(
-    storage: &KVStorage,
-    code: &InvitationCode,
-) -> Result<Option<Invitation>> {
-    let key = format!("{INVITATION}:{}", code.display());
-    let invitation = storage.read()?.get::<_, Invitation>(&key)?;
-
-    // keep the storage clean
-    if matches!(&invitation, Some(invitation) if invitation.is_expired()) {
-        storage.write().del(&key)?;
-        return Ok(None);
+impl UserTable for KVStorage {
+    fn user_is_registered(&self, username: &str) -> Result<bool> {
+        self.read()?
+            .has(format!("{PASSWORD}:{username}"))
+            .map_err(Into::into)
     }
 
-    Ok(invitation)
-}
-
-/// Check if the invitation exists and associated to the given user.
-pub fn signup_invitation_is_valid(
-    storage: &KVStorage,
-    code: &InvitationCode,
-    username: &str,
-) -> Result<bool> {
-    let Some(invitation) = get_signup_invitation(storage, code)? else {
-        return Ok(false);
-    };
-    Ok(invitation.username == username)
+    fn register_user_password(&self, username: &str, password_file: PasswordFile) -> Result<()> {
+        self.write()
+            .set(format!("{PASSWORD}:{username}"), &password_file)
+            .map_err(Into::into)
+    }
 }
 
 /// Sign up session
 #[derive(Deserialize, Serialize)]
 pub struct SignupSession {
-    #[serde(serialize_with = "InvitationCode::serialize")]
-    pub code: InvitationCode,
+    pub username: String,
     created_at: DateTime,
 }
 
@@ -83,9 +50,9 @@ impl SignupSession {
     const LIFETIME: Duration = Duration::minutes(1);
 
     /// Create a new signup session with the given data.
-    pub fn new(code: InvitationCode) -> Self {
+    pub fn new(username: String) -> Self {
         Self {
-            code,
+            username,
             created_at: DateTime::now(),
         }
     }
@@ -161,27 +128,6 @@ pub fn pull_signin_session(
         .extract::<_, SigninSession>(key)?
         .filter(|session| !session.is_expired());
     Ok(session)
-}
-
-/// Register a new user, removing the used invitation.
-pub fn register_user_password(
-    storage: &KVStorage,
-    code: &InvitationCode,
-    password_file: PasswordFile,
-) -> Result<()> {
-    let mut conn = storage.write();
-    let tx = conn.transaction()?;
-
-    let key = format!("{INVITATION}:{}", code.display());
-    let invitation = tx
-        .extract::<_, Invitation>(key)?
-        .ok_or_else(|| anyhow!("invitation does not exist"))?;
-
-    let key = format!("{PASSWORD}:{}", invitation.username);
-    tx.set(key, &password_file)?;
-
-    tx.commit()?;
-    Ok(())
 }
 
 /// Register a new user, removing the used invitation.
