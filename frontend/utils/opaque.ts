@@ -9,9 +9,6 @@ import {
   SigninFinishReq,
   SigninStartReq,
   SigninStartRes,
-  SignupFinishReq,
-  SignupStartReq,
-  SignupStartRes,
 } from "#utils/api.ts";
 
 /** Sign up arguments */
@@ -27,7 +24,6 @@ export const signup = async ({ code, username, password }: SignupArgs) => {
   const opaqueRegistration = OpaqueRegistration.start(password);
   const { session, message: startMessage } = await signupStart({
     code,
-    username,
     message: opaqueRegistration.message,
   });
   const { message: finishMessage } = opaqueRegistration.finish(
@@ -37,24 +33,51 @@ export const signup = async ({ code, username, password }: SignupArgs) => {
   await signupFinish({ session, message: finishMessage });
 };
 
-const signupStart = async (req: SignupStartReq) => {
-  const response = await api.post<SignupStartRes>("/signup/start", req);
-  if (response.ok) {
-    return response.data;
-  }
+/** Sign up start step request */
+interface SignupStartReq {
+  code: string;
+  message: string;
+}
 
+/** Sign up start step response */
+interface SignupStartRes {
+  session: string;
+  message: string;
+}
+
+/** Sig up start step */
+const signupStart = async (req: SignupStartReq) => {
+  const response = await fetch("/signup", {
+    method: "POST",
+    body: JSON.stringify(Object.assign({ step: "start" }, req)),
+    headers: { "content-type": "application/json" },
+  });
+  if (response.ok) {
+    return await response.json() as SignupStartRes;
+  }
   if (response.status === 401) {
     throw new Error("Invalid credentials");
   }
   throw new Error("Api server is not available");
 };
 
+/** Sign up finish step request */
+interface SignupFinishReq {
+  session: string;
+  message: string;
+}
+
+/** Sign up finish step */
 const signupFinish = async (req: SignupFinishReq) => {
-  const response = await api.post("/signup/finish", req);
+  const response = await fetch("/signup", {
+    method: "POST",
+    body: JSON.stringify(Object.assign({ step: "finish" }, req)),
+    headers: { "content-type": "application/json" },
+  });
   if (response.ok) {
+    await response.blob();
     return;
   }
-
   if (response.status === 401) {
     throw new Error("Invalid credentials");
   }

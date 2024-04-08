@@ -39,10 +39,16 @@ impl InvitationKey {
         let (invitation, signature) = code.into_parts()?;
         self.key
             .verify(invitation.as_bytes(), &signature)
-            .map_err(|_| InvalidInvitationCode)?;
-        let invitation: Invitation =
-            serde_json::from_str(&invitation).map_err(|_| InvalidInvitationCode)?;
+            .map_err(|err| {
+                tracing::error!("failed to verify invitation: {err}");
+                InvalidInvitationCode
+            })?;
+        let invitation: Invitation = serde_json::from_str(&invitation).map_err(|err| {
+            tracing::error!("invitation payload is not a valid json: {err}");
+            InvalidInvitationCode
+        })?;
         if invitation.is_expired() {
+            tracing::error!("used expired invitation");
             return Err(InvalidInvitationCode);
         }
         Ok(invitation)
@@ -179,7 +185,10 @@ impl InvitationCode {
         let signature_len = Base64Url::decode(signature.as_bytes(), &mut bytes)
             .map_err(|_| InvalidInvitationCode)?
             .len();
-        if signature_len != signature.len() {
+        if signature_len != Signature::BYTE_SIZE {
+            dbg!(signature_len);
+            dbg!(Signature::BYTE_SIZE);
+            tracing::error!("inviation signature has wrong length");
             return Err(InvalidInvitationCode);
         }
         let signature = Signature::from_bytes(&bytes);

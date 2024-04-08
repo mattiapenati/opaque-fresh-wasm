@@ -12,7 +12,7 @@ use crate::{
 use super::state::AppState;
 
 #[derive(Deserialize)]
-#[serde(tag = "step")]
+#[serde(tag = "step", rename_all = "lowercase")]
 pub enum Request {
     Start(StartReq),
     Finish(FinishReq),

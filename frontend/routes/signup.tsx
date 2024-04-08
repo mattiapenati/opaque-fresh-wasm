@@ -2,7 +2,6 @@ import { Head } from "$fresh/runtime.ts";
 import { Handlers, PageProps } from "$fresh/server.ts";
 
 import SignUpForm from "#islands/SignUpForm.tsx";
-import { api, Invitation } from "#utils/api.ts";
 
 interface Data {
   code?: string;
@@ -23,21 +22,23 @@ export default function SignUp({ data }: PageProps<Data>) {
 }
 
 export const handler: Handlers = {
-  async GET(req, ctx) {
+  GET(req, ctx) {
     const reqUrl = new URL(req.url);
     const code = reqUrl.searchParams.get("code");
-    const username = code && await fetchInvitationUsername(code);
+    let username;
+    try {
+      if (code) {
+        const encoded_invitation = code.split(".")[0];
+        const invitation = JSON.parse(atob(encoded_invitation));
+        username = invitation.username;
+      }
+    } catch (err) {
+      console.error(err);
+    }
 
     return ctx.render({
       code,
       username,
     });
   },
-};
-
-const fetchInvitationUsername = async (code: string) => {
-  const response = await api.get<Invitation>(`/signup/invitation/${code}`);
-  if (response.ok) {
-    return response.data.username;
-  }
 };

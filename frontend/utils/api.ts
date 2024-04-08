@@ -28,7 +28,7 @@ export class Api {
   readonly #token?: string;
 
   constructor(url: string, { token }: ApiOptions = {}) {
-    this.#url = new URL("/api", url).href;
+    this.#url = url;
     this.#token = token;
   }
 
@@ -90,27 +90,9 @@ if (IS_BROWSER) {
 }
 export { api };
 
-/** Invitation detail */
-export interface Invitation {
-  username: string;
-  expiration: string;
-}
-
-/** Sign up start step request */
-export interface SignupStartReq {
-  code: string;
-  username: string;
-  message: string;
-}
-
-/** Sign up start step response */
-export interface SignupStartRes {
-  session: string;
-  message: string;
-}
-
 /** Sign up finish step request */
 export interface SignupFinishReq {
+  step: "finish";
   session: string;
   message: string;
 }
